@@ -34,8 +34,9 @@ def calculate_h_i(segments:list[Segment]):
     h_i = []
     logger.debug(f"{segments=}")
     for segment in segments:
-        logger.debug(f"{segment=}")
+        # logger.debug(f"{segment=}")
         diff = segment.x_r - segment.x_l
+        # logger.debug(f"{diff=}")
         h_i.append(diff)
     return h_i
 
@@ -45,29 +46,35 @@ def get_a_i(y) -> list[float]:
 
 
 def tridiagonal_coefficients(y, h_i)-> list[Coefficient_c_i]:
-    '''
-        
-    '''
+    """
+    Формирует коэффициенты тридиагональной системы для естественного сплайна
+    c_0 = 0 и c_n = 0
+    """
 
     #n - количество отрезков и уравнений в системе
     n = len(h_i)
 
     coefficients = []
-    for i in range(1, n):
-        main_diagonal = h_i[i - 1] + h_i[i]
+    for i in range(0, n):
+        # Правильная формула для три диагональной системы
+        main_diagonal = 2 * (h_i[i - 1] + h_i[i])
         down_diagonal = h_i[i - 1]
         upper_diagonal = h_i[i]
 
-        # в массиве h индексы начинаются с 0, как и в массиве y
-        # поэтому индексы массива Y понижены на 1 для того чтобы формула коэффициентов значений, была корректной
+        # Правая часть уравнения
         answer = 3 * (((y[i + 1] - y[i]) / h_i[i]) - ((y[i] - y[i - 1]) / h_i[i - 1]))
+        
+        # Отладочная информация для точки x=1.4 (i=2)
         if i == 1:
+            # Первое уравнение: учитываем c_0 = 0
             coeff = Coefficient_c_i(0, main_diagonal, upper_diagonal, answer)
         elif i == n - 1:
+            # Последнее уравнение: учитываем c_n = 0
             coeff = Coefficient_c_i(down_diagonal, main_diagonal, 0, answer)
         else:
             coeff = Coefficient_c_i(down_diagonal, main_diagonal, upper_diagonal, answer)
         coefficients.append(coeff)
+    logger.debug(f"{len(coefficients)=}")
     return coefficients
 
 def calculate_U(coefficients: list[Coefficient_c_i]):
@@ -76,6 +83,7 @@ def calculate_U(coefficients: list[Coefficient_c_i]):
     for i, coeff in enumerate(coefficients[1:], start=1):
         u_i = -coeff.l/(coeff.p * U[i-1] + coeff.q)
         U.append(u_i)
+    logger.debug(f"{U=}")
     return U
 
 
@@ -97,36 +105,37 @@ def calculate_c_i(y, h_i):
     :return: коэффициенты кубического полинома c_i
     """
     coefficients = tridiagonal_coefficients(y, h_i)
+    logger.debug(f"{len(coefficients)=}")
     U = calculate_U(coefficients)
     V = calculate_V(coefficients)
 
-    n = len(U)
-    c = [0.0]  # c_0 = 0 для естественного сплайна
-    
-    # Обратный ход прогонки: c_i = U_i * c_{i+1} + V_i
-    for i in range(n):
-        c_i = U[i] * c[i] + V[i]
-        c.append(c_i)
+    logger.debug(f"{len(U)=}")
+    n = len(h_i)
+    c = [0.0] * (n + 1)
+    logger.debug(f"{len(c)=}; {c=}")
+    c[-1] = V[-1]
+    for i in range(n-1, 0, -1):
+        c_i = U[i] * c[i+1] + V[i]  # Используем c[i+1] вместо c[i]
+        c[i] = c_i  # Записываем в правильную позицию
+        logger.debug(f"{c_i=}")
+    logger.debug(f"{len(c)=}; {c=}")
     return c
 
 def calculate_d_i(c_i, h_i):
     n = len(h_i)
     d = []
-    for i in range(n - 1):
+    for i in range(n):
         d_i = (c_i[i + 1] - c_i[i]) / (3 * h_i[i])
         d.append(d_i)
-    d_n = -c_i[-1] / (3 * h_i[-1])
-    d.append(d_n)
+    logger.debug(f"{d}")
     return d
 
 def calculate_b_i(c, h, y):
     n = len(h)
     b = []
-    for i in range(n-1):
+    for i in range(n):
         b_i = (y[i+1] - y[i]) / h[i] - h[i] * (c[i + 1] + 2 * c[i]) / 3
         b.append(b_i)
-    b_n = (y[-1]-y[-2])/h[-1] - (2 * h[-1] * c[-1]) / 3
-    b.append(b_n)
     return b
 
 
@@ -147,6 +156,7 @@ def assembly_cubic_polynomial(x, a, b, c, d):
     functions = []
     for i, segment in enumerate(segments):
         # Создаем замыкание с зафиксированными коэффициентами
+        # Используем x[i] как базовую точку для i-го сегмента
         spline_func = create_spline_function(a[i], b[i], c[i], d[i], x[i])
         functions.append([segment, spline_func])
     return functions
@@ -157,7 +167,8 @@ def build_cubic_spline(input_data: list[Points], step_x=0.01):
 
     a_i, b_i, c_i, d_i = get_all_cubic_polynom_coefficients(segments, y)
 
-    polynomials = assembly_cubic_polynomial(x, a_i, b_i, c_i, d_i)
+    logger.debug(f"{len(a_i)=}; {len(c_i)=}; {len(b_i)=}; {len(d_i)=}")
+    polynomials = assembly_cubic_polynomial(x, a_i, b_i, c_i[:-1], d_i)
 
     result = generate_spline_points(polynomials, step_x, x)
 
@@ -167,17 +178,26 @@ def build_cubic_spline(input_data: list[Points], step_x=0.01):
 def generate_spline_points(polynomials: list[Any], step_x: float, x: list[Any]) -> list[Any]:
     result = []
     x_coordinate = x[0]
+    
     for polynom in polynomials:
         segment: Segment = polynom[0]
         cubic_polynom = polynom[1]
-        while segment.x_l <= x_coordinate < segment.x_r:
+        
+        # Генерируем точки для текущего сегмента
+        while x_coordinate < segment.x_r:
             y_coordinate = cubic_polynom(x_coordinate)
             result.append(Points(x_coordinate, y_coordinate))
             x_coordinate += step_x
-
-    if x_coordinate <= x[-1]:
+            
+            # Проверяем, не вышли ли за границы
+            if x_coordinate > x[-1]:
+                break
+    
+    # Добавляем последнюю точку, если она не была добавлена
+    if not result or result[-1].x < x[-1]:
         last_polynom = polynomials[-1][1]
-        result.append(Points(x[-1], last_polynom(x_coordinate)))
+        result.append(Points(x[-1], last_polynom(x[-1])))
+    
     return result
 
 
@@ -186,6 +206,7 @@ def get_all_cubic_polynom_coefficients(segments: list[Segment], y: list[float]) 
     h_i = calculate_h_i(segments)
 
     a_i = get_a_i(y)
+    logger.debug(f"{len(a_i)=}")
     c_i = calculate_c_i(y, h_i)
     d_i = calculate_d_i(c_i, h_i)
     b_i = calculate_b_i(c_i, h_i, y)
@@ -199,9 +220,8 @@ def extract_x_y(input_data:list[Points]) :
 
 
 if __name__ == '__main__':
-    # test_data = [(1.0, 3.8), (1.2, 3.2), (1.4, 2.9), (1.6, 3.0), (1.8, 4.2), (2.0, 4.8)]
     test_data = [ Points(1.0, 3.8), Points(1.2, 3.2), Points(1.4, 2.9), Points(1.6, 3.0), Points(1.8, 4.2), Points(2.0, 4.8)]
     result =  build_cubic_spline(test_data, step_x=0.01)
 
-    logger.debug(f"{len(result)=};\n{result}")
+    # logger.debug(f"{len(result)=};\n{result}")
 

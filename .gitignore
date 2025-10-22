@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+/test_spline.py
+/debug_spline.py
+
+/tmp/analysis_point_1_4.md
+/tmp/
