@@ -4,6 +4,9 @@
 # Поиск a_i
 import logging
 from collections import namedtuple
+from typing import Any
+
+Points = namedtuple("Points", ["x", "y"])
 
 Segment = namedtuple("Segment", ["x_l", "x_r"])
 
@@ -60,25 +63,10 @@ def tridiagonal_coefficients(y, h_i)-> list[Coefficient_c_i]:
         answer = 3 * (((y[i + 1] - y[i]) / h_i[i]) - ((y[i] - y[i - 1]) / h_i[i - 1]))
         if i == 1:
             coeff = Coefficient_c_i(0, main_diagonal, upper_diagonal, answer)
-            # coeff = {"p":0,
-            #          "q": main_diagonal,
-            #          "l": upper_diagonal,
-            #          "s": answer}
-            # coefficients.append({"p":0, "q": main_diagonal, "l": upper_diagonal, "s": answer})
         elif i == n - 1:
             coeff = Coefficient_c_i(down_diagonal, main_diagonal, 0, answer)
-            # coeff = {"p":down_diagonal,
-            #          "q": main_diagonal,
-            #          "l": 0,
-            #          "s": answer}
-            # coefficients.append({"p":down_diagonal, "q": main_diagonal, "l": 0, "s": answer})
         else:
             coeff = Coefficient_c_i(down_diagonal, main_diagonal, upper_diagonal, answer)
-            # coeff = {"p":down_diagonal,
-            #          "q": main_diagonal,
-            #          "l": upper_diagonal,
-            #          "s": answer}
-            # coefficients.append({"p":down_diagonal, "q": main_diagonal, "l": upper_diagonal, "s": answer})
         coefficients.append(coeff)
     return coefficients
 
@@ -163,33 +151,56 @@ def assembly_cubic_polynomial(x, a, b, c, d):
         functions.append([segment, spline_func])
     return functions
 
-def build_cubic_spline(input_data, step_x=0.01):
-    y = list(map(lambda c: c[1], input_data))
-    x = list(map(lambda c: c[0], input_data))
+def build_cubic_spline(input_data: list[Points], step_x=0.01):
+    x, y = extract_x_y(input_data)
     segments:list[Segment] = select_segments(x)
+
+    a_i, b_i, c_i, d_i = get_all_cubic_polynom_coefficients(segments, y)
+
+    polynomials = assembly_cubic_polynomial(x, a_i, b_i, c_i, d_i)
+
+    result = generate_spline_points(polynomials, step_x, x)
+
+    return result
+
+
+def generate_spline_points(polynomials: list[Any], step_x: float, x: list[Any]) -> list[Any]:
+    result = []
+    x_coordinate = x[0]
+    for polynom in polynomials:
+        segment: Segment = polynom[0]
+        cubic_polynom = polynom[1]
+        while segment.x_l <= x_coordinate < segment.x_r:
+            y_coordinate = cubic_polynom(x_coordinate)
+            result.append(Points(x_coordinate, y_coordinate))
+            x_coordinate += step_x
+
+    if x_coordinate <= x[-1]:
+        last_polynom = polynomials[-1][1]
+        result.append(Points(x[-1], last_polynom(x_coordinate)))
+    return result
+
+
+def get_all_cubic_polynom_coefficients(segments: list[Segment], y: list[float]) -> tuple[
+    list[float], list[float], list[float], list[float]]:
     h_i = calculate_h_i(segments)
 
     a_i = get_a_i(y)
     c_i = calculate_c_i(y, h_i)
     d_i = calculate_d_i(c_i, h_i)
     b_i = calculate_b_i(c_i, h_i, y)
+    return a_i, b_i, c_i, d_i
 
-    polynomials = assembly_cubic_polynomial(x, a_i, b_i, c_i, d_i)
 
-    result = []
-    x_coordinate = x[0]
-    for polynom in polynomials:
-        segment:Segment = polynom[0]
-        cubic_polynom = polynom[1]
-        while segment.x_l <= x_coordinate < segment.x_r:
-            y_coordinate = cubic_polynom(x_coordinate)
-            result.append((x_coordinate, y_coordinate))
-            x_coordinate += step_x
-    return result
+def extract_x_y(input_data:list[Points]) :
+    y = list(map(lambda c: c.y, input_data))
+    x = list(map(lambda c: c.x, input_data))
+    return x, y
 
 
 if __name__ == '__main__':
-    test_data = [(1.0, 3.8), (1.2, 3.2), (1.4, 2.9), (1.6, 3.0), (1.8, 4.2), (2.0, 4.8)]
+    # test_data = [(1.0, 3.8), (1.2, 3.2), (1.4, 2.9), (1.6, 3.0), (1.8, 4.2), (2.0, 4.8)]
+    test_data = [ Points(1.0, 3.8), Points(1.2, 3.2), Points(1.4, 2.9), Points(1.6, 3.0), Points(1.8, 4.2), Points(2.0, 4.8)]
     result =  build_cubic_spline(test_data, step_x=0.01)
 
     logger.debug(f"{len(result)=};\n{result}")
