@@ -2,7 +2,7 @@ import click
 import csv
 import logging
 
-INPUT_DATA = "input_data.csv"
+CSV_FILE = "input_data.csv"
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.NOTSET)
 
@@ -16,7 +16,7 @@ def read_data(file_name):
         return result
 
 def main():
-    input_data = read_data(INPUT_DATA)
+    input_data = read_data(CSV_FILE)
     logger.debug(f"Input data: {input_data}")
 
 
@@ -24,8 +24,6 @@ def main():
 @click.option('--input-data', prompt='Введите ваше имя')
 def hello(input_data):
     click.echo(f'Привет, {input_data}!')
-
-
 
 
 if __name__ == "__main__":
