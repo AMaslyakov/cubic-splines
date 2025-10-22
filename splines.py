@@ -55,14 +55,17 @@ def tridiagonal_coefficients(y, h_i)-> list[Coefficient_c_i]:
     n = len(h_i)
 
     coefficients = []
-    for i in range(0, n):
+    # цикл нельзяначинать с нуля потому что подставляем только 4 значения h_i
+    for i in range(1, n):
         # Правильная формула для три диагональной системы
         main_diagonal = 2 * (h_i[i - 1] + h_i[i])
         down_diagonal = h_i[i - 1]
         upper_diagonal = h_i[i]
 
         # Правая часть уравнения
-        answer = 3 * (((y[i + 1] - y[i]) / h_i[i]) - ((y[i] - y[i - 1]) / h_i[i - 1]))
+        left =   (y[i + 1] - y[i]) / h_i[i]
+        right  = (y[i] - y[i - 1]) / h_i[i - 1]
+        answer = 3 * (left - right)
         
         # Отладочная информация для точки x=1.4 (i=2)
         if i == 1:
@@ -74,7 +77,8 @@ def tridiagonal_coefficients(y, h_i)-> list[Coefficient_c_i]:
         else:
             coeff = Coefficient_c_i(down_diagonal, main_diagonal, upper_diagonal, answer)
         coefficients.append(coeff)
-    logger.debug(f"{len(coefficients)=}")
+
+    print([f"<< {c.s:.3f} >> " for c in coefficients])
     return coefficients
 
 def calculate_U(coefficients: list[Coefficient_c_i]):
@@ -110,15 +114,19 @@ def calculate_c_i(y, h_i):
     V = calculate_V(coefficients)
 
     logger.debug(f"{len(U)=}")
-    n = len(h_i)
-    c = [0.0] * (n + 1)
+    logger.debug(f"{V[-1]=}")
+    n = len(U)
+    c = [0.0] * (n+1)
     logger.debug(f"{len(c)=}; {c=}")
+
+
     c[-1] = V[-1]
+    c.append(0.0)
     for i in range(n-1, 0, -1):
         c_i = U[i] * c[i+1] + V[i]  # Используем c[i+1] вместо c[i]
         c[i] = c_i  # Записываем в правильную позицию
         logger.debug(f"{c_i=}")
-    logger.debug(f"{len(c)=}; {c=}")
+    # logger.debug(f"{len(c)=}; {c=}")
     return c
 
 def calculate_d_i(c_i, h_i):
@@ -208,6 +216,7 @@ def get_all_cubic_polynom_coefficients(segments: list[Segment], y: list[float]) 
     a_i = get_a_i(y)
     logger.debug(f"{len(a_i)=}")
     c_i = calculate_c_i(y, h_i)
+    logger.debug(f" ---- {c_i=}")
     d_i = calculate_d_i(c_i, h_i)
     b_i = calculate_b_i(c_i, h_i, y)
     return a_i, b_i, c_i, d_i
