@@ -87,7 +87,7 @@ def calculate_U(coefficients: list[Coefficient_c_i]):
     for i, coeff in enumerate(coefficients[1:], start=1):
         u_i = -coeff.l/(coeff.p * U[i-1] + coeff.q)
         U.append(u_i)
-    logger.debug(f"{U=}")
+    logger.debug(f"---- ----- {U=}")
     return U
 
 
